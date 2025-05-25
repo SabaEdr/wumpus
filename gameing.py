@@ -335,25 +335,27 @@ def choose_next_move():
     else:
         print("  AI Log (P3): No arrows left.")
 
-    # Priority 4: Backtrack to a safe, visited cell
+    # Priority 4: Backtrack to a safe, visited cell (excluding immediate last position if other options exist)
     print("AI Log: Checking Priority 4 (Backtrack to other safe visited cell)")
-    safe_visited_options = []
-    last_pos_option = None
+    safe_visited_options_not_last_pos = []
+    last_pos_as_safe_option = None  # To store the option of moving to last_player_pos if it's safe and visited
+
     for nx, ny in get_neighbors(player_pos, use_eight_directions=True):
         if knowledge[ny][nx] == 'safe' and (nx, ny) in visited:
             move_opt_tuple = ((nx, ny), f"Backtracking to safe cell ({nx},{ny}).")
-            if tuple(last_player_pos or [-1, -1]) == (nx, ny):
-                last_pos_option = move_opt_tuple
+            if tuple(last_player_pos or [-1, -1]) == (nx, ny):  # last_player_pos could be None
+                last_pos_as_safe_option = move_opt_tuple
             else:
-                safe_visited_options.append(move_opt_tuple)
+                safe_visited_options_not_last_pos.append(move_opt_tuple)
 
-    if safe_visited_options:
-        chosen_move_plan = random.choice(safe_visited_options)
-        print(f"  AI Log (P4): Other safe visited options: {[opt[0] for opt in safe_visited_options]}")
+    if safe_visited_options_not_last_pos:  # Prefer options that are not the immediate last position
+        chosen_move_plan = random.choice(safe_visited_options_not_last_pos)
+        print(
+            f"  AI Log (P4): Other safe visited options (excluding last_pos): {[opt[0] for opt in safe_visited_options_not_last_pos]}")
         print(f"  AI DECISION (P4): {chosen_move_plan[1]} Target: {chosen_move_plan[0]}")
         return chosen_move_plan
     else:
-        print("  AI Log (P4): No other safe visited cells to backtrack to.")
+        print("  AI Log (P4): No other safe visited cells (excluding last_pos) to backtrack to.")
 
     # Priority 5: Explore an 'unknown' cell
     print("AI Log: Checking Priority 5 (Explore unknown cell)")
@@ -369,27 +371,44 @@ def choose_next_move():
     else:
         print("  AI Log (P5): No unknown cells to explore.")
 
-    # Priority 6: Backtrack to immediate last position if it was the only safe-visited option
-    print("AI Log: Checking Priority 6 (Backtrack to immediate last position)")
-    if last_pos_option:
-        print(f"  AI DECISION (P6): {last_pos_option[1]} Target: {last_pos_option[0]}")
-        return last_pos_option
+    # Priority 6: If the only safe visited option was to go back to last_player_pos
+    print("AI Log: Checking Priority 6 (Backtrack to immediate last position if it was the only safe/visited option)")
+    if last_pos_as_safe_option:  # This was identified in P4's logic
+        print(f"  AI DECISION (P6): {last_pos_as_safe_option[1]} Target: {last_pos_as_safe_option[0]}")
+        return last_pos_as_safe_option
     else:
-        print("  AI Log (P6): No option to backtrack to immediate last position (or it wasn't safe/visited).")
+        print(
+            "  AI Log (P6): No option to backtrack to immediate last position (or it wasn't safe/visited or other P4 options existed).")
 
-    # Priority 7: Desperate Random Move
+    # --- MODIFIED PRIORITY 7: Desperate Random Move ---
     print("AI Log: Checking Priority 7 (Desperate Random Move)")
-    all_adjacent_cells = get_neighbors(player_pos, use_eight_directions=True)
-    if all_adjacent_cells:
-        chosen_random_neighbor = random.choice(all_adjacent_cells)
-        action_description = f"Desperate random move to ({chosen_random_neighbor[0]},{chosen_random_neighbor[1]})."
-        print(f"  AI Log (P7): All adjacent options for random move: {all_adjacent_cells}")
-        print(f"  AI DECISION (P7): {action_description} Target: {chosen_random_neighbor}")
-        return (chosen_random_neighbor, action_description)
-    else:
+    all_adjacent_neighbors = get_neighbors(player_pos, use_eight_directions=True)
+
+    if not all_adjacent_neighbors:
         action_description = "Critically stuck! No adjacent cells."
         print(f"  AI DECISION (P7 - Fallback): {action_description} Target: {player_pos}")
         return (tuple(player_pos), action_description)
+
+    # Try to pick a random neighbor that is NOT the last_player_pos, if such neighbors exist
+    non_last_pos_neighbors = [n for n in all_adjacent_neighbors if tuple(n) != tuple(
+        last_player_pos or [-1, -1])]  # Ensure last_player_pos is tuple for comparison
+
+    chosen_random_neighbor = None
+    action_description = ""
+
+    if non_last_pos_neighbors:
+        chosen_random_neighbor = random.choice(non_last_pos_neighbors)
+        action_description = f"Desperate random move (avoiding last pos) to ({chosen_random_neighbor[0]},{chosen_random_neighbor[1]})."
+        print(f"  AI Log (P7): Choosing from non-last_pos_neighbors for random move: {non_last_pos_neighbors}")
+    else:  # This means all_adjacent_neighbors is not empty, but non_last_pos_neighbors is empty
+        # So, the only available neighbor(s) must include or be only the last_player_pos
+        chosen_random_neighbor = random.choice(all_adjacent_neighbors)  # Must pick from what's available
+        action_description = f"Desperate random move (only option(s) include last pos) to ({chosen_random_neighbor[0]},{chosen_random_neighbor[1]})."
+        print(f"  AI Log (P7): No non-last_pos_neighbors. Choosing from all adjacent: {all_adjacent_neighbors}")
+
+    print(f"  AI DECISION (P7): {action_description} Target: {chosen_random_neighbor}")
+    return (chosen_random_neighbor, action_description)
+    # --- END MODIFICATION FOR P7 ---
 
 
 def agent_step():
