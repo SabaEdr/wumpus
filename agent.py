@@ -3,7 +3,7 @@ import random
 
 CELL_SIZE = 50
 GRID_SIZE = 10
-WIDTH, HEIGHT = CELL_SIZE * GRID_SIZE, CELL_SIZE * GRID_SIZE + 100
+WIDTH, HEIGHT = CELL_SIZE * GRID_SIZE, CELL_SIZE * GRID_SIZE + 80
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -46,26 +46,48 @@ def neighbors(pos):
     return result
 
 def place_objects():
+    # پاک کردن همه خانه‌ها و مجموعه‌ها
+    for y in range(GRID_SIZE):
+        for x in range(GRID_SIZE):
+            board[y][x] = ' '
+    wumpus_alive.clear()
+    
+    # خانه شروع و همسایه‌هایش را ممنوع می‌کنیم
     forbidden = [(0, 0)] + neighbors((0, 0))
-    count = 0
-    while count < NUM_WUMPUS:
+    
+    # قرار دادن وومپوس‌ها
+    wumpus_count = 0
+    attempts = 0
+    while wumpus_count < NUM_WUMPUS and attempts < 100:
         x, y = random.randint(0, GRID_SIZE-1), random.randint(0, GRID_SIZE-1)
         if (x,y) not in forbidden and board[y][x] == ' ':
             board[y][x] = 'W'
             wumpus_alive.add((x,y))
-            count += 1
-    count = 0
-    while count < NUM_PITS:
+            wumpus_count += 1
+        attempts += 1
+    
+    # قرار دادن گودال‌ها
+    pit_count = 0
+    attempts = 0
+    while pit_count < NUM_PITS and attempts < 100:
         x, y = random.randint(0, GRID_SIZE-1), random.randint(0, GRID_SIZE-1)
         if (x,y) not in forbidden and board[y][x] == ' ':
             board[y][x] = 'P'
-            count += 1
-    count = 0
-    while count < NUM_GOLD:
+            pit_count += 1
+        attempts += 1
+    
+    # قرار دادن طلاها
+    gold_count = 0
+    attempts = 0
+    while gold_count < NUM_GOLD and attempts < 100:
         x, y = random.randint(0, GRID_SIZE-1), random.randint(0, GRID_SIZE-1)
         if (x,y) not in forbidden and board[y][x] == ' ':
             board[y][x] = 'G'
-            count += 1
+            gold_count += 1
+        attempts += 1
+    
+    # چاپ تعداد اشیاء قرار گرفته شده برای اطمینان
+    print(f"Placed {wumpus_count} Wumpus, {pit_count} Pits, {gold_count} Gold")
 
 place_objects()
 
@@ -86,12 +108,23 @@ def draw_objects():
             rect = pygame.Rect(x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE)
             if (x,y) in visited:
                 if cell == 'G':
-                    pygame.draw.circle(screen, YELLOW, rect.center, CELL_SIZE//4)
+                    # نمایش طلا با رنگ زرد و علامت $ 
+                    pygame.draw.circle(screen, YELLOW, rect.center, CELL_SIZE//3)
+                    gold_text = font.render("$", True, BLACK)
+                    text_rect = gold_text.get_rect(center=rect.center)
+                    screen.blit(gold_text, text_rect)
                 elif cell == 'W':
-                    # اگر بخواهیم بعد از مردن Wumpus مخفی کنیم، این را تغییر دهید
-                    pygame.draw.circle(screen, RED, rect.center, CELL_SIZE//4)
+                    # نمایش وومپوس با رنگ قرمز و علامت W
+                    pygame.draw.circle(screen, RED, rect.center, CELL_SIZE//3)
+                    wumpus_text = font.render("W", True, WHITE)
+                    text_rect = wumpus_text.get_rect(center=rect.center)
+                    screen.blit(wumpus_text, text_rect)
                 elif cell == 'P':
+                    # نمایش گودال با رنگ آبی و علامت P
                     pygame.draw.rect(screen, BLUE, rect.inflate(-20, -20))
+                    pit_text = font.render("P", True, WHITE)
+                    text_rect = pit_text.get_rect(center=rect.center)
+                    screen.blit(pit_text, text_rect)
 
 def draw_player():
     x, y = player_pos
@@ -104,16 +137,26 @@ def draw_messages_on_cells():
             if (x,y) in visited:
                 rect = pygame.Rect(x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE)
                 msgs = []
-                # بوی بد (Wumpus alive در 8 جهت)
+                
+                # بررسی بوی بد (Stench) در خانه فعلی
+                has_stench = False
                 for nx, ny in neighbors((x,y)):
-                    if (nx, ny) in wumpus_alive:
-                        msgs.append("Stench")
+                    if board[ny][nx] == 'W' and (nx, ny) in wumpus_alive:
+                        has_stench = True
                         break
-                # باد (Pit در 8 جهت)
+                if has_stench:
+                    msgs.append("Stench")
+                
+                # بررسی باد (Breeze) در خانه فعلی
+                has_breeze = False
                 for nx, ny in neighbors((x,y)):
                     if board[ny][nx] == 'P':
-                        msgs.append("Breeze")
+                        has_breeze = True
                         break
+                if has_breeze:
+                    msgs.append("Breeze")
+                
+                # نمایش پیام‌ها
                 y_offset = 5
                 for msg in msgs:
                     text_surf = small_font.render(msg, True, ORANGE if msg=="Stench" else BLUE)
@@ -142,7 +185,6 @@ def draw_text_lines(lines, start_y):
     for i, line in enumerate(lines):
         msg = font.render(line, True, WHITE)
         screen.blit(msg, (10, start_y + i*25))
-
 
 # ----- هوش مصنوعی (Agent) -----
 knowledge = [['unknown' for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
@@ -284,8 +326,6 @@ def agent_step():
     else:
         reason = action[1]
         return reason
-
-# ----- پایان هوش مصنوعی -----
 
 def main():
     global player_pos, player_arrows, collected_gold

@@ -87,6 +87,10 @@ def draw_objects():
             if (x,y) in visited:
                 if cell == 'G':
                     pygame.draw.circle(screen, YELLOW, rect.center, CELL_SIZE//4)
+                elif cell == 'W':
+                    pygame.draw.circle(screen, RED, rect.center, CELL_SIZE//4)
+                elif cell == 'P':
+                    pygame.draw.rect(screen, BLUE, rect.inflate(-20, -20))
 
 def draw_player():
     x, y = player_pos
@@ -138,11 +142,12 @@ def check_game_over():
     return None
 
 def collect_gold():
-    global collected_gold
+    global collected_gold, show_gold_acquired_message_timer
     x, y = player_pos
     if board[y][x] == 'G':
         collected_gold += 1
         board[y][x] = ' '
+        show_gold_acquired_message_timer = 60 # Display message for 60 frames
         return True
     return False
 
@@ -153,6 +158,7 @@ def draw_text_lines(lines, start_y):
 
 # جهت تیراندازی ذخیره می‌شود
 shoot_direction = None
+show_gold_acquired_message_timer = 0 # Timer for "GOLD ACQUIRED!" message
 
 def get_target_from_direction(pos, direction):
     x, y = pos
@@ -171,7 +177,7 @@ def get_target_from_direction(pos, direction):
 game_over = False
 
 def main():
-    global player_pos, player_arrows, shoot_direction, game_over
+    global player_pos, player_arrows, shoot_direction, game_over, show_gold_acquired_message_timer
     running = True
     message_lines = []
     clock = pygame.time.Clock()
@@ -207,6 +213,14 @@ def main():
 
         draw_text_lines(message_lines, HEIGHT - 70)
         draw_text_lines([f"Arrows left: {player_arrows}"], HEIGHT - 40)
+
+        # Display "GOLD ACQUIRED!" message
+        if show_gold_acquired_message_timer > 0:
+            gold_msg_font = pygame.font.SysFont(None, 36) # Slightly larger
+            text_surf = gold_msg_font.render("GOLD ACQUIRED!", True, YELLOW)
+            text_rect = text_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50)) # Positioned above center
+            screen.blit(text_surf, text_rect)
+            show_gold_acquired_message_timer -= 1
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
